@@ -11,16 +11,23 @@
   gather_facts: no
 
   vars:
+    jdk_download_url: http://download.oracle.com/otn-pub/java/jdk/8u144-b01/090f390dda5b47b9b721c7dfaa008135/jdk-8u144-linux-x64.rpm
     default_folder: /home/vagrant
     hduser_home: /home/hduser
     hadoop_folder: /usr/local/hadoop
     hadoop_with_version: hadoop-2.8.1
     hadoop_folder_final: "{{ hadoop_folder }}/{{ hadoop_with_version }}"
     hadoop_conf_dir: "{{ hadoop_folder_final }}/etc/hadoop"
-    java_home: /usr/lib/jvm/java-8-oracle
-    mapred_site_props: <?xml version="1.0"?><?xml-stylesheet type="text/xsl" href="configuration.xsl"?><configuration><property><name>mapred.job.tracker</name><value>master:54311</value><description>The host and port that the MapReduce job tracker runs at.  If "local", then jobs are run in-process as a single map and reduce task. </description></property></configuration>
+    java_home: /usr/java/jdk1.8.0_144
+    mapred_site_props: <?xml version="1.0"?><?xml-stylesheet type="text/xsl" href="configuration.xsl"?><configuration><property><name>mapred.job.tracker</name><value>localhost:54311</value><description>The host and port that the MapReduce job tracker runs at.  If "local", then jobs are run in-process as a single map and reduce task. </description></property></configuration>
     
   tasks:
+  - name: Installing vim
+    yum:
+      name: vim
+      state: present
+      update_cache: yes
+
   - name: setting hosts -- master
     lineinfile: 
       dest: '/etc/hosts'
@@ -33,3 +40,158 @@
       line: "{{ hostvars[item]['inventory_hostname'] }}      {{ hostvars[item]['name'] }}"
     with_items: "{{ groups['hadoop_workers'] }}"
 
+  #- name: Updating /etc/hosts
+  #  lineinfile: dest="/etc/hosts"
+  #              line="0.0.0.1       master"
+
+  - name: Download jdk8
+    get_url:
+      url: "{{ jdk_download_url }}"
+      headers: "Cookie: oraclelicense=accept-securebackup-cookie"
+      dest: "/usr/local/src/jdk-8u144-linux-x64.rpm"
+
+  - name: Install the JDK via yum
+    yum:
+      name: "/usr/local/src/jdk-8u144-linux-x64.rpm"
+      state: present
+
+  - name: addgroup hadoop
+    group:
+      name: hadoop
+      state: present    
+
+  - name: addgroup hadoop
+    group:
+      name: hadoop
+      state: present    
+
+  - name: Adding user hduser
+    user: 
+      name: hduser
+      password: $6$i1X5M6lS$.sYSalRHezB6/HI.dcuK8of5dfwFaATO3wHMLMcy76yvAF1DUMHKxGSMa0PpNGYBxnTFJvzEG3CTyEhsk9qU5/
+      shell: /bin/bash
+      groups: hadoop
+      append: yes
+      generate_ssh_key: yes
+      ssh_key_bits: 2048
+      ssh_key_file: .ssh/id_rsa
+
+  - name: copying id_rsa.pub to authorized keys
+    command: "cp /home/hduser/.ssh/id_rsa.pub /home/hduser/.ssh/authorized_keys creates=/home/hduser/.ssh/authorized_keys"
+
+  - name: Download hadoop
+    get_url:
+      url: "http://ftp.unicamp.br/pub/apache/hadoop/common/{{hadoop_with_version}}/{{hadoop_with_version}}.tar.gz"
+      dest: "{{ default_folder }}/hadoop.tar.gz"
+
+  - name: Create hadoop dir -- bad smell. acho que ele tá criando esse cara toda a vez.
+    file: 
+      path: "{{ hadoop_folder }}"
+      state: directory
+      owner: hduser
+      group: hadoop   
+      recurse: yes      
+      mode: "u+rw,g-wx,o-rwx"
+
+  # TODO se eu nao setar o copy, ele pega da maquina local, o que pode ser muito bom
+  # para provisioonar muitas masquinas
+  # ATENCAO, ELE ESTA COPIANDO TODA VEZ ISSO. ATENCAO: ACHO QUE NAO ESTA COPIANDO TODA VEZ MAIS POR CAUSA DO CAMPO CREATES. DEVO TESTAR ISSO
+  - name: extracting hadoop 
+    unarchive:
+      src: "{{ default_folder }}/hadoop.tar.gz"
+      dest: "{{ hadoop_folder }}"
+      copy: no
+      creates: "{{ hadoop_folder_final }}"
+      group: hadoop
+      owner: hduser
+
+  - name: checa se hadoop_home is setted
+    shell: "echo $HADOOP_HOME"
+    register: hadoop_home
+  
+  - name: export hadoop home
+    blockinfile:
+      dest: "{{ hduser_home }}/.bashrc"
+      content: |
+        export HADOOP_HOME={{ hadoop_folder_final }}
+        export PATH=$PATH:$HADOOP_HOME/bin
+
+  - name: setting hadoop-env.sh
+    lineinfile: dest="{{ hadoop_conf_dir }}/hadoop-env.sh"
+                line="export JAVA_HOME=${JAVA_HOME}"
+                state=absent
+
+  - name: setting hadoop-env.sh
+    lineinfile: dest="{{ hadoop_conf_dir }}/hadoop-env.sh"
+                line="export JAVA_HOME={{ java_home }}"
+                state=present
+
+  - name: Create tmp-haddop dir
+    file: 
+      path: /app/hadoop/tmp
+      state: directory
+      owner: hduser
+      group: hadoop   
+      mode: "u+rwx,g+rx,o-rwx"
+      recurse: yes      
+
+  - name: Create tmp-haddop dir
+    file: 
+      path: /app/hadoop/tmp
+      state: directory
+      owner: hduser
+      group: hadoop   
+      mode: "u+rwx,g+rx,o-rwx"
+      recurse: yes      
+
+  - name: Updating core-site.xml
+    blockinfile:
+      dest: "{{ hadoop_conf_dir }}/core-site.xml"
+      content: |
+        <property>
+          <name>hadoop.tmp.dir</name>
+          <value>/app/hadoop/tmp</value>
+          <description>A base for other temporary directories.</description>
+        </property>
+        <property>
+          <name>fs.default.name</name>
+          <value>hdfs://localhost:54310</value>
+          <description>The name of the default file system.  A URI whose scheme and authority determine the FileSystem implementation.  The uri's scheme determines the config property (fs.SCHEME.impl) naming the FileSystem implementation class.  The uri's authority is used to determine the host, port, etc. for a filesystem.</description>
+        </property>
+      insertbefore: "</configuration>"
+
+  - name: creating mapred-site.xml
+    copy:
+      content: ""
+      dest: "{{ hadoop_conf_dir }}/mapred-site.xml"
+      force: no
+
+  - name: Updating mapred-site.xml
+    lineinfile: dest="{{ hadoop_conf_dir }}/mapred-site.xml"
+                line="{{ mapred_site_props }}"
+                state=present
+
+  - name: Updating hdfs-site.xml
+    blockinfile:
+      dest: "{{ hadoop_conf_dir }}/hdfs-site.xml"
+      content: |
+          <property>
+            <name>dfs.replication</name>
+            <value>1</value>
+            <description>Default block replication. The actual number of replications can be specified when the file is created. The default is used if replication is not specified in create time. </description>
+          </property>
+      insertbefore: "</configuration>"
+
+  # - name: creating namenode
+  #   command: "{{ hadoop_folder_final }}/bin/hadoop namenode -format creates=/home/hduser/namenode_created"
+  #   become: true
+  #   become_user: hduser
+
+  - name: Permission to /app/hadoop/tmp again to be sure that hdfuser have permission to dfs folder
+    file: 
+      path: /app/hadoop/tmp
+      state: directory
+      owner: hduser
+      group: hadoop   
+      mode: "u+rwx,g+rx,o-rwx"
+      recurse: yes      
