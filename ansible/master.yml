@@ -1,0 +1,35 @@
+# referencia: http://www.michael-noll.com/tutorials/running-hadoop-on-ubuntu-linux-multi-node-cluster/
+#
+# devo rodar o seguinte comando
+# ansible-playbook -i inventory master.yml
+#
+- name: Provision master
+  hosts: hadoop_master
+  remote_user: vagrant
+  become: yes
+  become_method: sudo
+  gather_facts: no
+
+  vars:
+    default_folder: /home/vagrant
+    hduser_home: /home/hduser
+    hadoop_folder: /usr/local/hadoop
+    hadoop_with_version: hadoop-2.8.1
+    hadoop_folder_final: "{{ hadoop_folder }}/{{ hadoop_with_version }}"
+    hadoop_conf_dir: "{{ hadoop_folder_final }}/etc/hadoop"
+    java_home: /usr/lib/jvm/java-8-oracle
+    mapred_site_props: <?xml version="1.0"?><?xml-stylesheet type="text/xsl" href="configuration.xsl"?><configuration><property><name>mapred.job.tracker</name><value>master:54311</value><description>The host and port that the MapReduce job tracker runs at.  If "local", then jobs are run in-process as a single map and reduce task. </description></property></configuration>
+    
+  tasks:
+  - name: setting hosts -- master
+    lineinfile: 
+      dest: '/etc/hosts'
+      line: "{{ hostvars[item]['inventory_hostname'] }}      {{ hostvars[item]['name'] }}"
+    with_items: "{{ groups['hadoop_master'] }}"
+
+  - name: setting hosts -- slaves
+    lineinfile: 
+      dest: '/etc/hosts'
+      line: "{{ hostvars[item]['inventory_hostname'] }}      {{ hostvars[item]['name'] }}"
+    with_items: "{{ groups['hadoop_workers'] }}"
+
