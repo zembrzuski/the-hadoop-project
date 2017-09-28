@@ -1,0 +1,61 @@
+# referencia: http://www.michael-noll.com/tutorials/running-hadoop-on-ubuntu-linux-multi-node-cluster/
+#
+# devo rodar o seguinte comando
+# ansible-playbook -i inventory master.yml
+#
+- name: Provision master
+  hosts: hadoop_master
+  remote_user: vagrant
+  become: yes
+  become_method: sudo
+  gather_facts: no
+
+  tasks:
+  - name: setting hosts -- master
+    lineinfile: 
+      dest: '/etc/hosts'
+      line: "{{ hostvars[item]['inventory_hostname'] }}      {{ hostvars[item]['name'] }}"
+    with_items: "{{ groups['hadoop_master'] }}"
+
+  - name: setting hosts -- slaves
+    lineinfile: 
+      dest: '/etc/hosts'
+      line: "{{ hostvars[item]['inventory_hostname'] }}      {{ hostvars[item]['name'] }}"
+    with_items: "{{ groups['hadoop_workers'] }}"
+
+  - name: addgroup hadoop
+    group:
+      name: hadoop
+      state: present    
+
+  - name: addgroup hadoop
+    group:
+      name: hadoop
+      state: present    
+
+  - name: Adding user hduser
+    user: 
+      name: hduser
+      password: $6$i1X5M6lS$.sYSalRHezB6/HI.dcuK8of5dfwFaATO3wHMLMcy76yvAF1DUMHKxGSMa0PpNGYBxnTFJvzEG3CTyEhsk9qU5/
+      shell: /bin/bash
+      groups: hadoop
+      append: yes
+
+  - name: "creating .ssh directory"
+    file:
+      path: /home/hduser/.ssh
+      state: directory
+      owner: hduser
+      group: hduser
+      mode: 0700
+
+
+  # copiar o id_rs  a.pub p/ authorized keys da maquina
+  - name: "copyind id_rsa.pub from local machine to remote machine as authorized_keys"
+    copy:
+      src: /home/zembrzuski/.ssh/id_rsa.pub
+      dest: /home/hduser/.ssh/authorized_keys
+      owner: hduser
+      group: hduser
+      remote_src: no
+      mode: 0600
