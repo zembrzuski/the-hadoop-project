@@ -41,6 +41,7 @@
       groups: hadoop
       append: yes
 
+  # simplesmente estou criando o diretorio aqui.
   - name: "creating .ssh directory"
     file:
       path: /home/hduser/.ssh
@@ -49,8 +50,19 @@
       group: hduser
       mode: 0700
 
+  # com a chave privada da minha maquina local na minha maquina remota, vou ser capaz de
+  # acessar todos os servidores que possuem a chave respectiva chave publica.
+  - name: "copyind id_rsa.pub from local machine to remote machine as authorized_keys"
+    copy:
+      src: /home/zembrzuski/.ssh/
+      dest: /home/hduser/.ssh/  
+      owner: hduser
+      group: hduser
+      remote_src: no
+      mode: 0700
 
-  # copiar o id_rs  a.pub p/ authorized keys da maquina
+  # com a chave publica no minha maquina remota, consigo acessar a partir da
+  # minha maquina fisica
   - name: "copyind id_rsa.pub from local machine to remote machine as authorized_keys"
     copy:
       src: /home/zembrzuski/.ssh/id_rsa.pub
