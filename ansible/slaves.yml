@@ -20,6 +20,7 @@
     hadoop_conf_dir: "{{ hadoop_folder_final }}/etc/hadoop"
     java_home: /usr/java/jdk1.8.0_144
     mapred_site_props: <?xml version="1.0"?><?xml-stylesheet type="text/xsl" href="configuration.xsl"?><configuration><property><name>mapred.job.tracker</name><value>master:54311</value><description>The host and port that the MapReduce job tracker runs at.  If "local", then jobs are run in-process as a single map and reduce task. </description></property></configuration>
+    hadoop_tmp_dir: /hadoop/tmp
     
   tasks:
   - name: Installing vim
@@ -149,7 +150,7 @@
 
   - name: Create tmp-haddop dir
     file: 
-      path: /app/hadoop/tmp
+      path: "{{ hadoop_tmp_dir }}"
       state: directory
       owner: hduser
       group: hadoop   
@@ -158,7 +159,7 @@
 
   - name: Create tmp-haddop dir
     file: 
-      path: /app/hadoop/tmp
+      path: "{{ hadoop_tmp_dir }}"
       state: directory
       owner: hduser
       group: hadoop   
@@ -171,7 +172,7 @@
       content: |
         <property>
           <name>hadoop.tmp.dir</name>
-          <value>/app/hadoop/tmp</value>
+          <value>{{ hadoop_tmp_dir }}</value>
           <description>A base for other temporary directories.</description>
         </property>
         <property>
@@ -203,9 +204,9 @@
           </property>
       insertbefore: "</configuration>"
 
-  - name: Permission to /app/hadoop/tmp again to be sure that hdfuser have permission to dfs folder
+  - name: Permission to tmp dir again to be sure that hdfuser have permission to dfs folder
     file: 
-      path: /app/hadoop/tmp
+      path: "{{ hadoop_tmp_dir }}"
       state: directory
       owner: hduser
       group: hadoop   

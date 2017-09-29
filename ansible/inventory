@@ -1,7 +1,7 @@
 [hadoop_master]
-10.40.192.182 name=master
+10.40.192.164 name=master
 
 [hadoop_workers]
-10.40.192.116 name=slave1
-10.40.192.190 name=slave2
+10.40.192.191 name=slave1
+10.40.192.105 name=slave2
 
