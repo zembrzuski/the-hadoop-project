@@ -131,13 +131,6 @@
     shell: "echo $HADOOP_HOME"
     register: hadoop_home
   
-  - name: export hadoop home
-    blockinfile:
-      dest: "{{ hduser_home }}/.bashrc"
-      content: |
-        export HADOOP_HOME={{ hadoop_folder_final }}
-        export PATH=$PATH:$HADOOP_HOME/bin
-
   - name: setting hadoop-env.sh
     lineinfile: dest="{{ hadoop_conf_dir }}/hadoop-env.sh"
                 line="export JAVA_HOME=${JAVA_HOME}"
@@ -230,3 +223,43 @@
       dest: "{{ hadoop_conf_dir }}/slaves"
       line: "{{ hostvars[item]['name'] }}"
     with_items: "{{ groups['hadoop_workers'] }}"
+
+  - name: Download scala
+    get_url:
+      url: http://downloads.lightbend.com/scala/2.11.8/scala-2.11.8.rpm
+      dest: /home/hduser/scala.rpm
+
+  - name: Install scala
+    yum:
+      name: "/home/hduser/scala.rpm"
+      state: present
+
+  - name: Download spark
+    get_url:
+      url: https://d3kbcqa49mib13.cloudfront.net/spark-2.2.0-bin-hadoop2.7.tgz
+      dest: /home/hduser/spark.tgz
+
+  - name: "creating spark directory"
+    file:
+      path: /usr/local/spark
+      state: directory
+      owner: hduser
+      group: hduser
+      mode: 0700
+
+  - name: unarchiving spark
+    command: tar -C /usr/local/spark -zxvf /home/hduser/spark.tgz 
+
+  - name: setting env var | bashrc
+    lineinfile: 
+      dest: '/home/hduser/.bashrc'
+      line: "export SPARK_HOME=/usr/local/spark/spark-2.2.0-bin-hadoop2.7"
+
+  - name: export hadoop home
+    blockinfile:
+      dest: "{{ hduser_home }}/.bashrc"
+      content: |
+        export HADOOP_HOME={{ hadoop_folder_final }}
+        export JAVA_HOME=/usr/java/jdk1.8.0_144
+        export SPARK_HOME=/usr/local/spark/spark-2.2.0-bin-hadoop2.7
+        export PATH=$PATH:$HADOOP_HOME/bin:$JAVA_HOME/bin:$SPARK_HOME/bin
