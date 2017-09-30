@@ -183,7 +183,7 @@
       content: |
           <property>
             <name>dfs.replication</name>
-            <value>2</value>
+            <value>1</value>
             <description>Default block replication. The actual number of replications can be specified when the file is created. The default is used if replication is not specified in create time. </description>
           </property>
       insertbefore: "</configuration>"
@@ -263,3 +263,17 @@
         export JAVA_HOME=/usr/java/jdk1.8.0_144
         export SPARK_HOME=/usr/local/spark/spark-2.2.0-bin-hadoop2.7
         export PATH=$PATH:$HADOOP_HOME/bin:$JAVA_HOME/bin:$SPARK_HOME/bin
+
+  - name: "create spark-env.sh file"
+    copy:
+      src: /usr/local/spark/spark-2.2.0-bin-hadoop2.7/conf/spark-env.sh.template
+      dest: /usr/local/spark/spark-2.2.0-bin-hadoop2.7/conf/spark-env.sh
+      owner: hduser
+      group: hduser
+      remote_src: yes
+      mode: 0700
+
+  - name: "setting spark-env.sh file"
+    lineinfile: 
+      dest: /usr/local/spark/spark-2.2.0-bin-hadoop2.7/conf/spark-env.sh
+      line: "export HADOOP_CONF_DIR=${{ hadoop_folder_final }}/etc/hadoop"
